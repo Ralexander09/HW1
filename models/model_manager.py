@@ -9,7 +9,7 @@ from sklearn.metrics import mean_squared_error
 
 
 class ModelManager:
-    def __init__(self, data_path):
+    def __init__(self):
         # Словарь для хранения обученных моделей
         self.models = {}
         # Доступные классы моделей и их гиперпараметры
@@ -17,7 +17,7 @@ class ModelManager:
             "RandomForest": RandomForestRegressor,
             "LinearRegression": LinearRegression
         }
-        self.data = pd.read_csv(data_path)
+        # self.data = pd.read_csv(data_path)
 
     def transform_data(self):
         print('Entered fransform_data function')
@@ -28,7 +28,7 @@ class ModelManager:
         """Возвращает список доступных классов моделей."""
         return list(self.model_classes.keys())
 
-    def train_model(self, model_type, hyperparams):
+    def train_model(self, model_type, hyperparams, data_path):
         """
         Обучает модель заданного типа с переданными гиперпараметрами.
         Возвращает уникальный ID модели.
@@ -42,7 +42,10 @@ class ModelManager:
 
         # Генерируем обучающие данные (замените на собственные данные)
         # X, y = make_classification(n_samples=100, n_features=20, random_state=42)
-        X, y = self.transform_data()
+        # X, y = self.transform_data()
+        data = pd.read_csv(data_path)
+        X, y = data.iloc[:, :-1], data.iloc[:, -1]
+
         print('Successfully transformed data')
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -55,12 +58,15 @@ class ModelManager:
         self.models[model_id] = model
         return model_id
 
-    def predict(self, model_id):
+    def predict(self, model_id, data_path):
         """
         Выполняет предсказание на основе входных данных для конкретной модели.
         """
         model = self.models.get(model_id)
-        X, y = self.transform_data()
+        data = pd.read_csv(data_path)
+        X, y = data.iloc[:, :-1], data.iloc[:, -1]
+
+        # X, y = self.transform_data()
         print('Successfully transformed data')
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -85,4 +91,3 @@ class ModelManager:
     def list_models(self):
         """Возвращает список всех обученных моделей с их ID."""
         return list(self.models.keys())
-
