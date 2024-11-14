@@ -2,7 +2,7 @@
 Домашняя работа №1 по MLOps
 Выполнили: Романенко Александр и Староверова Анна
 
-Как запустить:
+Как запустить RestAPI:
 
 uvicorn api.rest.main:app --host 127.0.0.1 --port 8000
 
@@ -12,3 +12,4 @@ streamlit run dashboard/app.py
 
 <img width="669" alt="Снимок экрана 2024-11-11 в 23 50 36" src="https://github.com/user-attachments/assets/6f10d708-803b-4f48-b0f1-b1c7562c9312">
 
+Как устроен gPRC (не судите строго за название папки grps, случайная опечата, замеченная только в конце):
