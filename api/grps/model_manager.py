@@ -76,6 +76,7 @@ class ModelManager:
         # Преобразуем входные данные в numpy-массив для предсказания
         # input_array = np.array(input_data).reshape(1, -1)
         prediction = model.predict(X_test)
+        print('Successfully predicted data')
         return prediction.tolist(), mean_squared_error(y_test, prediction)
         # return prediction.tolist()  # Преобразуем в список для JSON-сериализации
 

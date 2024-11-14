@@ -8,9 +8,10 @@ service ModelService {
   rpc service_status (empty) returns (status_response);
 }
 
+
 message train_request {
   string model_type = 1;
-  map<string, string> hyperparams = 2;
+  map<string, int32> hyperparams = 2;
   string data_path = 3;
 }
 
@@ -25,7 +26,7 @@ message predict_request {
 
 message predict_response {
   repeated float prediction = 1;
-  repeated float MSE = 2;
+  float MSE = 2;
 }
 
 message delete_request {

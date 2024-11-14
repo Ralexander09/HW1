@@ -2,6 +2,7 @@ from concurrent import futures
 import grpc
 import uuid
 import main_pb2_grpc
+import main_pb2
 
 #from models.model_manager import ModelManager
 from model_manager import ModelManager
@@ -18,11 +19,13 @@ class ModelServiceStub(main_pb2_grpc.ModelServiceStub):
         hyperparams = request.hyperparams
         data_path = request.data_path
         model_id = self.model_manager.train_model(model_type, hyperparams, data_path)
-        return {"model_id": model_id}
+        output = {"model_id": model_id}
+        return main_pb2.train_response(**output)
 
     # Функция для получения доступных моделей
-    def get_model_types(self, _):
-        return self.model_manager.get_available_models()
+    def get_model_types(self, request, context):
+        output = {"model_types": self.model_manager.get_available_models()}
+        return main_pb2.model_list(**output)
 
     # Функция для прогнозирования
     def predict(self, request, context):
@@ -31,7 +34,9 @@ class ModelServiceStub(main_pb2_grpc.ModelServiceStub):
         prediction, mse = self.model_manager.predict(model_id, data_path)
         if prediction is None:
             raise context.abort(grpc.StatusCode.NOT_FOUND, "Model not found")
-        return {"prediction": prediction, "MSE": mse}
+            
+        output = {"prediction": prediction, "MSE": mse}
+        return main_pb2.predict_response(**output)
 
     # Функция для удаления модели
     def delete_model(self, request, context):
@@ -39,11 +44,14 @@ class ModelServiceStub(main_pb2_grpc.ModelServiceStub):
         success = self.model_manager.delete_model(model_id)
         if not success:
             raise context.abort(grpc.StatusCode.NOT_FOUND, "Model not found") 
-        return {"status": "deleted"}
+            
+        output = {"status": "deleted"}
+        return main_pb2.delete_response(**output)
             
     # Функция для определения текущего статуса
-    def service_status(self, _):
-        return {"status": "running", "models": self.model_manager.list_models()}
+    def service_status(self, request, context):
+        output = {"status": "running", "models": self.model_manager.list_models()}
+        return main_pb2.status_response(**output)
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

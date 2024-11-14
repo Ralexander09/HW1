@@ -12,15 +12,15 @@ class train_request(_message.Message):
         KEY_FIELD_NUMBER: _ClassVar[int]
         VALUE_FIELD_NUMBER: _ClassVar[int]
         key: str
-        value: str
-        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+        value: int
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[int] = ...) -> None: ...
     MODEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     HYPERPARAMS_FIELD_NUMBER: _ClassVar[int]
     DATA_PATH_FIELD_NUMBER: _ClassVar[int]
     model_type: str
-    hyperparams: _containers.ScalarMap[str, str]
+    hyperparams: _containers.ScalarMap[str, int]
     data_path: str
-    def __init__(self, model_type: _Optional[str] = ..., hyperparams: _Optional[_Mapping[str, str]] = ..., data_path: _Optional[str] = ...) -> None: ...
+    def __init__(self, model_type: _Optional[str] = ..., hyperparams: _Optional[_Mapping[str, int]] = ..., data_path: _Optional[str] = ...) -> None: ...
 
 class train_response(_message.Message):
     __slots__ = ("model_id",)
@@ -41,8 +41,8 @@ class predict_response(_message.Message):
     PREDICTION_FIELD_NUMBER: _ClassVar[int]
     MSE_FIELD_NUMBER: _ClassVar[int]
     prediction: _containers.RepeatedScalarFieldContainer[float]
-    MSE: _containers.RepeatedScalarFieldContainer[float]
-    def __init__(self, prediction: _Optional[_Iterable[float]] = ..., MSE: _Optional[_Iterable[float]] = ...) -> None: ...
+    MSE: float
+    def __init__(self, prediction: _Optional[_Iterable[float]] = ..., MSE: _Optional[float] = ...) -> None: ...
 
 class delete_request(_message.Message):
     __slots__ = ("model_id",)
