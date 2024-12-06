@@ -33,4 +33,5 @@ Thumbs.db
 
 # Streamlit
 .streamlit/
-data/data.json
+.dvc/
+/data/*.json
