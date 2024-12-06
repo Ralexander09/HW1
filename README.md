@@ -30,7 +30,7 @@ pip install "dvc[s3]"
     git commit -m "Initialize DVC"
 
     dvc remote add -d minio s3://my-bucket
-    dvc remote modify minio endpointurl http://127.0.0.1:9090
+    dvc remote modify minio endpointurl http://127.0.0.1:9000
     dvc remote modify minio access_key_id minioadmin
     dvc remote modify minio secret_access_key minioadmin123
     dvc remote modify minio region us-east-1
