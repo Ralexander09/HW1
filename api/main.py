@@ -1,3 +1,4 @@
+# main.py
 from fastapi import FastAPI, HTTPException
 from model_manager import ModelManager
 from pydantic import BaseModel
@@ -14,7 +15,7 @@ async def root():
 class TrainRequest(BaseModel):
     model_type: str
     hyperparams: dict
-    data: list = None  # Field for JSON data
+    data: list = None  # Поле для JSON данных
 
     class Config:
         extra = "forbid"
@@ -23,12 +24,12 @@ class TrainRequest(BaseModel):
 @app.post("/train")
 def train_model(request: TrainRequest):
     """
-    Train a new model with the specified type, hyperparameters, and data.
-    If data is not provided, default JSON data is used.
+    Обучить новую модель с указанным типом, гиперпараметрами и данными.
+    Если данные не предоставлены, используются дефолтные JSON данные.
     """
     model_type = request.model_type
     hyperparams = request.hyperparams
-    data = request.data  # Can be None
+    data = request.data  # Может быть None
 
     try:
         model_id = model_manager.train_model(
@@ -45,17 +46,17 @@ def train_model(request: TrainRequest):
 @app.get("/models")
 def get_model_types():
     """
-    Retrieve a list of available model types.
+    Получить список доступных типов моделей.
     """
     try:
         available_models = model_manager.get_available_models()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return available_models
+    return {"available_models": available_models}
 
 
 class PredictRequest(BaseModel):
-    data: list = None  # Field for JSON data
+    data: list = None  # Поле для JSON данных
 
     class Config:
         extra = "forbid"
@@ -64,10 +65,10 @@ class PredictRequest(BaseModel):
 @app.post("/predict/{model_id}")
 def predict(model_id: str, request: PredictRequest):
     """
-    Make a prediction using the specified model and data.
-    If data is not provided, default JSON data is used.
+    Сделать предсказание с использованием указанной модели и данных.
+    Если данные не предоставлены, используются дефолтные JSON данные.
     """
-    data = request.data  # Can be None
+    data = request.data  # Может быть None
 
     try:
         prediction, mse = model_manager.predict(model_id=model_id, data=data)
@@ -93,7 +94,7 @@ def predict(model_id: str, request: PredictRequest):
 @app.delete("/model/{model_id}")
 def delete_model(model_id: str):
     """
-    Delete the specified model.
+    Удалить указанную модель.
     """
     try:
         success = model_manager.delete_model(model_id)
@@ -108,7 +109,7 @@ def delete_model(model_id: str):
 @app.get("/status")
 def service_status():
     """
-    Get the current status of the service and list of models.
+    Получить текущий статус сервиса и список моделей.
     """
     try:
         models = model_manager.list_models()

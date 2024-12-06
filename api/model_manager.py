@@ -1,7 +1,9 @@
+# model_manager.py
 import json
 import os
 import subprocess
 import uuid
+from io import BytesIO
 
 import joblib
 import pandas as pd
@@ -12,12 +14,16 @@ from sklearn.metrics import mean_squared_error
 
 
 class ModelManager:
-    def __init__(self, models_dir="saved_models", bucket_name="my-bucket"):
+    def __init__(
+        self, models_dir="saved_models", data_dir="data", bucket_name="my-bucket"
+    ):
         self.models = {}
         self.models_dir = models_dir
+        self.data_dir = data_dir
         os.makedirs(self.models_dir, exist_ok=True)
+        os.makedirs(self.data_dir, exist_ok=True)
 
-        # Инициализируем Minio клиент
+        # Инициализируем MinIO клиент
         self.minio_client = Minio(
             "localhost:9000",
             access_key="minioadmin",
@@ -25,6 +31,7 @@ class ModelManager:
             secure=False,
         )
 
+        # Проверяем наличие bucket, если нет - создаём
         found = self.minio_client.bucket_exists(bucket_name)
         if not found:
             self.minio_client.make_bucket(bucket_name)
@@ -245,31 +252,51 @@ class ModelManager:
         if model_type not in self.model_classes:
             raise ValueError(f"Model type '{model_type}' is not supported.")
 
-        # Создаем уникальный ID модели
+        # Создаём уникальный ID модели
         model_id = str(uuid.uuid4())
 
-        # Сохраняем датасет под текущим model_id, если прислан
-        if data is not None:
-            data_path = f"data/train_{model_id}.json"
-            with open(data_path, "w") as f:
-                json.dump(data, f)
-        else:
-            # Если не прислан датасет, используем дефолтный, тоже версионируем
-            data_path = f"data/train_{model_id}.json"
-            with open(data_path, "w") as f:
-                json.dump(self.DEFAULT_DATA, f)
+        # Определяем пути для данных
+        data_path = os.path.join(self.data_dir, f"train_{model_id}.json")
 
-        # Добавим датасет под контроль DVC
-        subprocess.run(["dvc", "add", data_path], check=True)
-        subprocess.run(
-            ["git", "add", data_path, f"{data_path}.dvc", ".gitignore"], check=True
-        )
-        subprocess.run(
-            ["git", "commit", "-m", f"Add training dataset for model {model_id}"],
-            check=True,
-        )
-        # Пушим датасет в MinIO
-        subprocess.run(["dvc", "push"], check=True)
+        # Сохраняем датасет
+        with open(data_path, "w") as f:
+            json.dump(data if data is not None else self.DEFAULT_DATA, f)
+
+        try:
+            # Добавляем датасет под контроль DVC
+            subprocess.run(
+                ["dvc", "add", data_path],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            # Добавляем только .dvc файл и .gitignore в Git
+            subprocess.run(
+                ["git", "add", f"{data_path}.dvc", ".gitignore"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            # Коммитим изменения
+            subprocess.run(
+                ["git", "commit", "-m", f"Add training dataset for model {model_id}"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            # Пушим датасет в удалённое хранилище
+            subprocess.run(
+                ["dvc", "push"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            error_message = e.stderr.decode().strip()
+            raise RuntimeError(f"Ошибка при выполнении команд DVC/Git: {error_message}")
 
         # Загружаем данные
         df = pd.read_json(data_path)
@@ -286,12 +313,20 @@ class ModelManager:
 
         self.models[model_id] = model
 
-        # Сохраняем модель локально и заливаем в MinIO
+        # Сохраняем модель локально
         model_path = os.path.join(self.models_dir, f"{model_id}.joblib")
         joblib.dump(model, model_path)
-        self.minio_client.fput_object(
-            self.bucket_name, f"{model_id}.joblib", model_path
-        )
+
+        # Загружаем модель в MinIO
+        try:
+            self.minio_client.fput_object(
+                self.bucket_name, f"{model_id}.joblib", model_path
+            )
+        except Exception as e:
+            os.remove(model_path)
+            raise RuntimeError(f"Ошибка при загрузке модели в MinIO: {str(e)}")
+
+        # Удаляем локальную копию модели
         os.remove(model_path)
 
         return model_id
@@ -300,8 +335,6 @@ class ModelManager:
         if model_id in self.models:
             return self.models[model_id]
         # Попытаемся загрузить из MinIO
-        from io import BytesIO
-
         try:
             response = self.minio_client.get_object(
                 self.bucket_name, f"{model_id}.joblib"
@@ -342,8 +375,10 @@ class ModelManager:
         return prediction.tolist(), mse
 
     def delete_model(self, model_id):
+        # Удаляем модель из памяти, если она загружена
         if model_id in self.models:
             del self.models[model_id]
+        # Удаляем модель из MinIO
         try:
             self.minio_client.remove_object(self.bucket_name, f"{model_id}.joblib")
             return True
@@ -351,4 +386,11 @@ class ModelManager:
             return False
 
     def list_models(self):
-        return list(self.models.keys())
+        # Получаем список объектов в bucket и фильтруем модели
+        objects = self.minio_client.list_objects(self.bucket_name, recursive=True)
+        model_ids = [
+            obj.object_name.replace(".joblib", "")
+            for obj in objects
+            if obj.object_name.endswith(".joblib")
+        ]
+        return model_ids
