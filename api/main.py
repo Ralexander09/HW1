@@ -1,5 +1,3 @@
-import json
-
 from fastapi import FastAPI, HTTPException
 from model_manager import ModelManager
 from pydantic import BaseModel
@@ -75,13 +73,21 @@ def predict(model_id: str, request: PredictRequest):
         prediction, mse = model_manager.predict(model_id=model_id, data=data)
     except KeyError:
         raise HTTPException(status_code=404, detail="Model not found")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        raise HTTPException(status_code=500, detail=str(re))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     if prediction is None:
         raise HTTPException(status_code=404, detail="Prediction failed")
 
-    return {"prediction": prediction, "MSE": mse}
+    response = {"prediction": prediction}
+    if mse is not None:
+        response["MSE"] = mse
+
+    return response
 
 
 @app.delete("/model/{model_id}")

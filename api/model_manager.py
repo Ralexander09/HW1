@@ -7,7 +7,6 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
 
 
 class ModelManager:
@@ -269,16 +268,15 @@ class ModelManager:
                 "Data must contain at least two columns (features and target)."
             )
 
-        X, y = df.iloc[:, :-1], df.iloc[:, -1]
+        # Предполагаем, что последняя колонка - это целевая переменная
+        X = df.iloc[:, :-1]
+        y = df.iloc[:, -1]
 
         print("Successfully transformed data")
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
 
         # Train the model
         try:
-            model.fit(X_train, y_train)
+            model.fit(X, y)
         except Exception as e:
             raise RuntimeError(f"Failed to train the model: {e}")
 
@@ -333,11 +331,11 @@ class ModelManager:
             data (list of dict, optional): Prediction data in JSON format.
 
         Returns:
-            tuple: Predictions (list) and Mean Squared Error (float).
+            tuple: Predictions (list) and Mean Squared Error (float or None).
         """
         model = self.load_model(model_id)
         if not model:
-            return None, None
+            raise KeyError("Model not found")
 
         # Use provided data or default data
         if data is not None:
@@ -345,23 +343,32 @@ class ModelManager:
         else:
             df = pd.DataFrame(self.DEFAULT_DATA)
 
-        if df.shape[1] < 2:
-            raise ValueError(
-                "Data must contain at least two columns (features and target)."
-            )
+        if df.empty:
+            raise ValueError("No data provided for prediction.")
 
-        X, y = df.iloc[:, :-1], df.iloc[:, -1]
+        # Проверяем, содержит ли данные целевую переменную "y"
+        has_y = "y" in df.columns
+
+        if has_y:
+            X = df.drop(columns=["y"])
+            y_true = df["y"]
+        else:
+            X = df
+            y_true = None
 
         print("Successfully transformed data")
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
 
         try:
-            prediction = model.predict(X_test)
-            mse = mean_squared_error(y_test, prediction)
+            prediction = model.predict(X)
         except Exception as e:
             raise RuntimeError(f"Failed to make predictions: {e}")
+
+        mse = None
+        if y_true is not None:
+            try:
+                mse = mean_squared_error(y_true, prediction)
+            except Exception as e:
+                raise RuntimeError(f"Failed to calculate MSE: {e}")
 
         return prediction.tolist(), mse
 
