@@ -13,7 +13,34 @@ pyenv activate mlopshw2
 poetry env use $(pyenv which python)
 poetry shell
 poetry install
+pip install "dvc[s3]"
 ```
+### Minio
+    docker run -p 9000:9000 -p 9090:9090 \
+    -e "MINIO_ROOT_USER=minioadmin" \
+    -e "MINIO_ROOT_PASSWORD=minioadmin123" \
+    quay.io/minio/minio server /data --console-address ":9090"
+
+Далее переходим на http://127.0.0.1:9090 login minioadmin, пароль minioadmin123 и создаем бакет my-bucket (если его нет)
+
+Далее я инициализировал dvc
+### DVC
+    dvc init
+    git add .dvc .gitignore
+    git commit -m "Initialize DVC"
+
+    dvc remote add -d minio s3://my-bucket
+    dvc remote modify minio endpointurl http://127.0.0.1:9090
+    dvc remote modify minio access_key_id minioadmin
+    dvc remote modify minio secret_access_key minioadmin123
+    dvc remote modify minio region us-east-1
+    dvc remote modify minio use_ssl false
+
+тут добавляем и отправляем данные в minio
+    dvc add /Users/oanovitskij/Desktop/hse/mlops_hw2/HW1/data/
+    git add /Users/oanovitskij/Desktop/hse/mlops_hw2/HW1/data.dvc
+    git commit -m "Добавлены данные с использованием DVC"
+    dvc push
 
 ### Rest:
     poetry run python api/main.py

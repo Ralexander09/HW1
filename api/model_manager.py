@@ -1,35 +1,40 @@
+import json
 import os
+import subprocess
 import uuid
 
-import joblib  # For saving models
-import numpy as np
+import joblib
 import pandas as pd
+from minio import Minio
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
 
 class ModelManager:
-    def __init__(self, models_dir="saved_models"):
-        """
-        Initializes the model manager.
-
-        Args:
-            models_dir (str): Directory to save models.
-        """
-        # Dictionary to store trained models
+    def __init__(self, models_dir="saved_models", bucket_name="my-bucket"):
         self.models = {}
-        # Directory to save models
         self.models_dir = models_dir
         os.makedirs(self.models_dir, exist_ok=True)
 
-        # Available model classes and their hyperparameters
+        # Инициализируем Minio клиент
+        self.minio_client = Minio(
+            "localhost:9000",
+            access_key="minioadmin",
+            secret_key="minioadmin123",
+            secure=False,
+        )
+
+        found = self.minio_client.bucket_exists(bucket_name)
+        if not found:
+            self.minio_client.make_bucket(bucket_name)
+        self.bucket_name = bucket_name
+
         self.model_classes = {
             "RandomForest": RandomForestRegressor,
             "LinearRegression": LinearRegression,
         }
 
-        # Default JSON data
         self.DEFAULT_DATA = [
             {"X": 230.1, "y": 22.1},
             {"X": 44.5, "y": 10.4},
@@ -234,121 +239,96 @@ class ModelManager:
         ]
 
     def get_available_models(self):
-        """Returns a list of available model types."""
         return list(self.model_classes.keys())
 
     def train_model(self, model_type, hyperparams, data=None):
-        """
-        Trains a model of the specified type with given hyperparameters and data.
-        Returns a unique model ID.
-
-        Args:
-            model_type (str): Type of the model ("RandomForest" or "LinearRegression").
-            hyperparams (dict): Hyperparameters for the model.
-            data (list of dict, optional): Training data in JSON format.
-
-        Returns:
-            str: Unique ID of the trained model.
-        """
         if model_type not in self.model_classes:
             raise ValueError(f"Model type '{model_type}' is not supported.")
 
-        # Initialize the model with hyperparameters
-        ModelClass = self.model_classes[model_type]
-        model = ModelClass(**hyperparams)
+        # Создаем уникальный ID модели
+        model_id = str(uuid.uuid4())
 
-        # Use provided data or default data
+        # Сохраняем датасет под текущим model_id, если прислан
         if data is not None:
-            df = pd.DataFrame(data)
+            data_path = f"data/train_{model_id}.json"
+            with open(data_path, "w") as f:
+                json.dump(data, f)
         else:
-            df = pd.DataFrame(self.DEFAULT_DATA)
+            # Если не прислан датасет, используем дефолтный, тоже версионируем
+            data_path = f"data/train_{model_id}.json"
+            with open(data_path, "w") as f:
+                json.dump(self.DEFAULT_DATA, f)
 
+        # Добавим датасет под контроль DVC
+        subprocess.run(["dvc", "add", data_path], check=True)
+        subprocess.run(
+            ["git", "add", data_path, f"{data_path}.dvc", ".gitignore"], check=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", f"Add training dataset for model {model_id}"],
+            check=True,
+        )
+        # Пушим датасет в MinIO
+        subprocess.run(["dvc", "push"], check=True)
+
+        # Загружаем данные
+        df = pd.read_json(data_path)
         if df.shape[1] < 2:
             raise ValueError(
                 "Data must contain at least two columns (features and target)."
             )
-
-        # Предполагаем, что последняя колонка - это целевая переменная
         X = df.iloc[:, :-1]
         y = df.iloc[:, -1]
 
-        print("Successfully transformed data")
+        ModelClass = self.model_classes[model_type]
+        model = ModelClass(**hyperparams)
+        model.fit(X, y)
 
-        # Train the model
-        try:
-            model.fit(X, y)
-        except Exception as e:
-            raise RuntimeError(f"Failed to train the model: {e}")
-
-        print("Trained model")
-
-        # Generate a unique ID for the model and save it
-        model_id = str(uuid.uuid4())
         self.models[model_id] = model
 
-        # Save the model to disk
+        # Сохраняем модель локально и заливаем в MinIO
         model_path = os.path.join(self.models_dir, f"{model_id}.joblib")
-        try:
-            joblib.dump(model, model_path)
-        except Exception as e:
-            raise RuntimeError(f"Failed to save the model: {e}")
-
-        print(f"Model saved to {model_path}")
+        joblib.dump(model, model_path)
+        self.minio_client.fput_object(
+            self.bucket_name, f"{model_id}.joblib", model_path
+        )
+        os.remove(model_path)
 
         return model_id
 
     def load_model(self, model_id):
-        """
-        Loads a model by its ID.
-
-        Args:
-            model_id (str): Unique ID of the model.
-
-        Returns:
-            sklearn.base.BaseEstimator: Loaded model or None if not found.
-        """
         if model_id in self.models:
             return self.models[model_id]
+        # Попытаемся загрузить из MinIO
+        from io import BytesIO
 
-        # Attempt to load the model from disk
-        model_path = os.path.join(self.models_dir, f"{model_id}.joblib")
-        if os.path.exists(model_path):
-            try:
-                model = joblib.load(model_path)
-                self.models[model_id] = model
-                return model
-            except Exception as e:
-                raise RuntimeError(f"Failed to load the model from {model_path}: {e}")
-
-        return None
+        try:
+            response = self.minio_client.get_object(
+                self.bucket_name, f"{model_id}.joblib"
+            )
+            model_bytes = response.read()
+            model = joblib.load(BytesIO(model_bytes))
+            self.models[model_id] = model
+            return model
+        except Exception:
+            return None
 
     def predict(self, model_id, data=None):
-        """
-        Makes predictions using the specified model and data.
-
-        Args:
-            model_id (str): Unique ID of the model.
-            data (list of dict, optional): Prediction data in JSON format.
-
-        Returns:
-            tuple: Predictions (list) and Mean Squared Error (float or None).
-        """
         model = self.load_model(model_id)
         if not model:
             raise KeyError("Model not found")
 
-        # Use provided data or default data
+        # Загружаем данные
         if data is not None:
             df = pd.DataFrame(data)
         else:
+            # Можно взять дефолтный датасет
             df = pd.DataFrame(self.DEFAULT_DATA)
 
         if df.empty:
             raise ValueError("No data provided for prediction.")
 
-        # Проверяем, содержит ли данные целевую переменную "y"
         has_y = "y" in df.columns
-
         if has_y:
             X = df.drop(columns=["y"])
             y_true = df["y"]
@@ -356,47 +336,19 @@ class ModelManager:
             X = df
             y_true = None
 
-        print("Successfully transformed data")
-
-        try:
-            prediction = model.predict(X)
-        except Exception as e:
-            raise RuntimeError(f"Failed to make predictions: {e}")
-
-        mse = None
-        if y_true is not None:
-            try:
-                mse = mean_squared_error(y_true, prediction)
-            except Exception as e:
-                raise RuntimeError(f"Failed to calculate MSE: {e}")
+        prediction = model.predict(X)
+        mse = mean_squared_error(y_true, prediction) if y_true is not None else None
 
         return prediction.tolist(), mse
 
     def delete_model(self, model_id):
-        """
-        Deletes a model by its ID.
-
-        Args:
-            model_id (str): Unique ID of the model.
-
-        Returns:
-            bool: True if deletion was successful, False otherwise.
-        """
-        # Remove from memory
         if model_id in self.models:
             del self.models[model_id]
-
-        # Remove from disk
-        model_path = os.path.join(self.models_dir, f"{model_id}.joblib")
-        if os.path.exists(model_path):
-            try:
-                os.remove(model_path)
-                return True
-            except Exception as e:
-                raise RuntimeError(f"Failed to delete the model from {model_path}: {e}")
-
-        return False
+        try:
+            self.minio_client.remove_object(self.bucket_name, f"{model_id}.joblib")
+            return True
+        except Exception:
+            return False
 
     def list_models(self):
-        """Returns a list of all trained model IDs."""
         return list(self.models.keys())

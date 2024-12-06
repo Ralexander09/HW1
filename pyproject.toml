@@ -18,6 +18,8 @@ uuid = "^1.30"
 grpcio = "^1.67.1"
 grpcio-tools = "^1.67.1"
 python-multipart = "^0.0.19"
+minio = "^7.2.12"
+dvc = "^3.58.0"
 
 
 [build-system]
