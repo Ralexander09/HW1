@@ -17,6 +17,7 @@ pydantic = "^2.9.2"
 uuid = "^1.30"
 grpcio = "^1.67.1"
 grpcio-tools = "^1.67.1"
+python-multipart = "^0.0.19"
 
 
 [build-system]
