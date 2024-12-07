@@ -5,6 +5,9 @@ import subprocess
 import uuid
 from io import BytesIO
 
+import clearml
+from clearml import Task, Logger
+
 import joblib
 import pandas as pd
 from minio import Minio
@@ -15,7 +18,7 @@ from sklearn.metrics import mean_squared_error
 
 class ModelManager:
     def __init__(
-        self, models_dir="saved_models", data_dir="data", bucket_name="my-bucket"
+            self, models_dir="saved_models", data_dir="data", bucket_name="my-bucket"
     ):
         self.models = {}
         self.models_dir = models_dir
@@ -255,8 +258,20 @@ class ModelManager:
         # Создаём уникальный ID модели
         model_id = str(uuid.uuid4())
 
+        # Инициализируем задачу ClearML
+        task = Task.init(
+            project_name='MLOps_HW2',
+            task_name='Model' + ' ' + model_id,
+            tags=[model_type])
+
         # Определяем пути для данных
         data_path = os.path.join(self.data_dir, f"train_{model_id}.json")
+
+        # Загружаем путь к данным в задачу ClearML
+        task.upload_artifact(name='data_train.path', artifact_object=data_path)
+
+        # Загружаем гиперпараметры в задачу ClearML
+        task.connect(hyperparams)
 
         # Сохраняем датасет
         with open(data_path, "w") as f:
@@ -304,6 +319,10 @@ class ModelManager:
             raise ValueError(
                 "Data must contain at least two columns (features and target)."
             )
+
+        # Загружаем сами данные в задачу ClearML
+        task.upload_artifact(name='data_train.data', artifact_object=df)
+
         X = df.iloc[:, :-1]
         y = df.iloc[:, -1]
 
@@ -311,11 +330,29 @@ class ModelManager:
         model = ModelClass(**hyperparams)
         model.fit(X, y)
 
+        prediction = model.predict(X)
+        mse = round(mean_squared_error(y, prediction), 3) if y is not None else None
+        max_err = round(max_error(y, prediction), 3) if y is not None else None
+        r2 = round(r2_score(y, prediction), 3) if y is not None else None
+        mape = round(mean_absolute_percentage_error(y, prediction), 3) if y is not None else None
+
+        # Логируем метрики на обучении в ClearML
+        log = Logger.current_logger()
+        log.report_single_value(name='Train MSE', value=mse)
+        log.report_single_value(name='Train Maximum Error', value=max_err)
+        log.report_single_value(name='Train Determination coef.', value=r2)
+        log.report_single_value(name='Train MAPE', value=mape)
+        log.report_single_value(name='Train Rows', value=X.shape[0])
+        log.report_single_value(name='Train Ratio', value=round(y.mean(), 3))
+
         self.models[model_id] = model
 
         # Сохраняем модель локально
         model_path = os.path.join(self.models_dir, f"{model_id}.joblib")
         joblib.dump(model, model_path)
+
+        # Сохраняем модель в ClearML
+        model.save_model(f"{model_id}.cbm")
 
         # Загружаем модель в MinIO
         try:
@@ -351,6 +388,9 @@ class ModelManager:
         if not model:
             raise KeyError("Model not found")
 
+        # Загружаем задачу в ClearML для выбранного ID модели
+        task = Task.get_task(project_name='MLOps_HW2', task_name='Model' + ' ' + model_id)
+
         # Загружаем данные
         if data is not None:
             df = pd.DataFrame(data)
@@ -361,6 +401,9 @@ class ModelManager:
         if df.empty:
             raise ValueError("No data provided for prediction.")
 
+        # Загружаем сами данные в задачу ClearML
+        task.upload_artifact(name='data_test.data', artifact_object=df)
+
         has_y = "y" in df.columns
         if has_y:
             X = df.drop(columns=["y"])
@@ -370,7 +413,19 @@ class ModelManager:
             y_true = None
 
         prediction = model.predict(X)
-        mse = mean_squared_error(y_true, prediction) if y_true is not None else None
+        mse = round(mean_squared_error(y_true, prediction), 3) if y_true is not None else None
+        max_err = round(max_error(y_true, prediction), 3) if y_true is not None else None
+        r2 = round(r2_score(y_true, prediction), 3) if y_true is not None else None
+        mape = round(mean_absolute_percentage_error(y_true, prediction), 3) if y_true is not None else None
+
+        # Логируем метрики на обучении в ClearML
+        log = Logger.current_logger()
+        log.report_single_value(name='Predict MSE', value=mse)
+        log.report_single_value(name='Predict Maximum Error', value=max_err)
+        log.report_single_value(name='Predict Determination coef.', value=r2)
+        log.report_single_value(name='Predict MAPE', value=mape)
+        log.report_single_value(name='Predict Rows', value=X.shape[0])
+        log.report_single_value(name='Predict Ratio', value=round(y_true.mean(), 3))
 
         return prediction.tolist(), mse
 
