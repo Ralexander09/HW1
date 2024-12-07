@@ -1,0 +1,19 @@
+# FastAPI и uvicorn для REST API
+fastapi==0.95.2
+uvicorn==0.22.0
+
+# Библиотеки для работы с gRPC
+grpcio==1.56.0
+grpcio-tools==1.56.0
+
+# Библиотеки для ML-моделей
+scikit-learn==1.3.0
+pandas==2.0.3
+numpy==1.25.2
+
+# Streamlit для создания дашборда
+streamlit==1.25.0
+
+# Дополнительные зависимости (необязательно, в зависимости от нужд)
+# requests - для отправки HTTP-запросов в дашборде Streamlit
+requests==2.31.0
