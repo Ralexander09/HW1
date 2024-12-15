@@ -45,8 +45,10 @@ pip install "dvc[s3]"
 ### ClearML
 #### Windows
 Создаем директории для данных и логов при их отсутствии:
-    mkdir c:\opt\clearml\data
-    mkdir c:\opt\clearml\logs
+```python
+mkdir c:\opt\clearml\data
+mkdir c:\opt\clearml\logs
+```
     
 Запускаем docker-compose:
     docker-compose -f clearml\docker-compose-win10.yml up
