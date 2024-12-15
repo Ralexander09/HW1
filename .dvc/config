@@ -1,0 +1,11 @@
+[core]
+    remote = minio
+['remote "myremote"']
+    url = s3://my-bucket
+['remote "minio"']
+    url = s3://my-bucket
+    endpointurl = http://127.0.0.1:9000
+    access_key_id = minioadmin
+    secret_access_key = minioadmin123
+    region = us-east-1
+    use_ssl = false
