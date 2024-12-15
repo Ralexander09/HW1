@@ -51,20 +51,26 @@ mkdir c:\opt\clearml\logs
 ```
     
 Запускаем docker-compose:
-    docker-compose -f clearml\docker-compose-win10.yml up
+```python
+docker-compose -f clearml\docker-compose-win10.yml up
+```
 
 #### MacOS
 Создаем директории для данных и логов при их отсутствии:
-    sudo mkdir -p /opt/clearml/data/elastic_7
-    sudo mkdir -p /opt/clearml/data/mongo_4/db
-    sudo mkdir -p /opt/clearml/data/mongo_4/configdb        
-    sudo mkdir -p /opt/clearml/data/redis
-    sudo mkdir -p /opt/clearml/logs
-    sudo mkdir -p /opt/clearml/config
-    sudo mkdir -p /opt/clearml/data/fileserver
-    
+```python
+sudo mkdir -p /opt/clearml/data/elastic_7
+sudo mkdir -p /opt/clearml/data/mongo_4/db
+sudo mkdir -p /opt/clearml/data/mongo_4/configdb        
+sudo mkdir -p /opt/clearml/data/redis
+sudo mkdir -p /opt/clearml/logs
+sudo mkdir -p /opt/clearml/config
+sudo mkdir -p /opt/clearml/data/fileserver
+```
+  
 Запускаем docker-compose:
-    docker-compose -f clearml\docker-compose.yml up
+```python
+docker-compose -f clearml\docker-compose.yml up
+```
 
 Сервер открывается по ссылке:
 http://localhost:8080/
