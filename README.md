@@ -41,6 +41,31 @@ pip install "dvc[s3]"
     git add /Users/oanovitskij/Desktop/hse/mlops_hw2/HW1/data.dvc
     git commit -m "Добавлены данные с использованием DVC"
     dvc push
+    
+### ClearML
+#### Windows
+Создаем директории для данных и логов при их отсутствии:
+    mkdir c:\opt\clearml\data
+    mkdir c:\opt\clearml\logs
+    
+Запускаем docker-compose:
+    docker-compose -f clearml\docker-compose-win10.yml up
+
+#### MacOS
+Создаем директории для данных и логов при их отсутствии:
+    sudo mkdir -p /opt/clearml/data/elastic_7
+    sudo mkdir -p /opt/clearml/data/mongo_4/db
+    sudo mkdir -p /opt/clearml/data/mongo_4/configdb        
+    sudo mkdir -p /opt/clearml/data/redis
+    sudo mkdir -p /opt/clearml/logs
+    sudo mkdir -p /opt/clearml/config
+    sudo mkdir -p /opt/clearml/data/fileserver
+    
+Запускаем docker-compose:
+    docker-compose -f clearml\docker-compose.yml up
+
+Сервер открывается по ссылке:
+http://localhost:8080/
 
 ### Rest:
     poetry run python api/main.py
