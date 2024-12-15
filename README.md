@@ -75,6 +75,27 @@ docker-compose -f clearml\docker-compose.yml up
 Сервер открывается по ссылке:
 http://localhost:8080/
 
+Credentials для доступа:
+```python
+api {
+web_server:http://localhost:8080/
+api_server:http://localhost:8008
+files_server:http://localhost:8081
+credentials {
+"access_key"="SRKN0ANVDJO3J7WU9MC0EWVZEL0EZP"
+"secret_key"="V3IDTLJ96zV2JYcGSDXhIKzwLn0fxe-N5mYRP9c74NIT9ro0fXc9r5IszXiP1OV854Q"
+}
+}
+```
+
+```python
+%envCLEARML_WEB_HOST="http://localhost:8080/"
+%envCLEARML_API_HOST="http://localhost:8008"
+%envCLEARML_FILES_HOST="http://localhost:8081"
+%envCLEARML_API_ACCESS_KEY="SRKN0ANVDJO3J7WU9MC0EWVZEL0EZP"
+%envCLEARML_API_SECRET_KEY="V3IDTLJ96zV2JYcGSDXhIKzwLn0fxe-N5mYRP9c74NIT9ro0fXc9r5IszXiP1OV854Q"
+```
+
 ### Rest:
     poetry run python api/main.py
 
